@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Wizgroup - Agendador de Atividade</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; margin: 15px; font-size: 14px; background-color: #f8f9fa; color: #343a40; }
+        .container { max-width: 400px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 16px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #status { margin-top: 15px; font-weight: bold; }
+    </style>
+    <script src="https://cdn.chatwoot.com/packs/js/sdk.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h3>Agendar Atividade</h3>
+        <p id="lead-info">Carregando dados do lead...</p>
+        <form id="schedule-form">
+            <div class="form-group">
+                <label for="tipo-evento">Tipo de Evento</label>
+                <select id="tipo-evento" name="tipo-evento" required>
+                    <option value="Entrevista">Entrevista</option>
+                    <option value="Follow-up">Follow-up (Tarefa)</option>
+                </select>
+            </div>
+            <div class="form-group" id="subtipo-group">
+                <label for="subtipo-entrevista">Tipo de Entrevista</label>
+                <select id="subtipo-entrevista" name="subtipo-entrevista">
+                    <option value="Online">Online</option>
+                    <option value="Presencial">Presencial</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="event-date">Data</label>
+                <input type="date" id="event-date" name="event-date" required>
+            </div>
+            <div class="form-group">
+                <label for="event-time">Hora</label>
+                <input type="time" id="event-time" name="event-time" required>
+            </div>
+            <div class="form-group">
+                <label for="event-title">Título / Objetivo</label>
+                <input type="text" id="event-title" name="event-title" required>
+            </div>
+            <button type="submit">Agendar</button>
+        </form>
+        <p id="status"></p>
+    </div>
+
+    <script>
+        // Objeto para armazenar os dados contextuais
+        let context = {};
+
+        // Executa quando a página é carregada
+        window.onload = function() {
+            // Inicializa o SDK do Chatwoot
+            window.chatwootSDK.run();
+
+            // Adiciona um "ouvinte" para o evento 'ready' do SDK
+            window.addEventListener('chatwoot:ready', function () {
+                console.log('SDK do Chatwoot está pronto.');
+                
+                // Pega os dados do contato e do usuário (vendedor)
+                const contact = window.chatwootSDK.getContact();
+                const user = window.chatwootSDK.getUser();
+
+                contact.then(contactData => {
+                    context.contact = contactData;
+                    document.getElementById('lead-info').innerText = `Agendando para: ${contactData.name || 'Contato sem nome'}`;
+                    document.getElementById('event-title').value = `Conversar com ${contactData.name}`;
+                });
+
+                user.then(userData => {
+                    context.user = userData;
+                });
+            });
+
+            // Lógica para mostrar/ocultar o subtipo de entrevista
+            const tipoEventoSelect = document.getElementById('tipo-evento');
+            const subtipoGroup = document.getElementById('subtipo-group');
+            tipoEventoSelect.addEventListener('change', function() {
+                subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
+            });
+        };
+
+        // Executa quando o formulário é enviado
+        document.getElementById('schedule-form').addEventListener('submit', function(event) {
+            event.preventDefault(); // Impede o envio padrão do formulário
+
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = 'Enviando agendamento...';
+
+            const formData = {
+                contact: context.contact,
+                user: context.user,
+                tipoEvento: document.getElementById('tipo-evento').value,
+                subtipoEntrevista: document.getElementById('subtipo-entrevista').value,
+                data: document.getElementById('event-date').value,
+                hora: document.getElementById('event-time').value,
+                titulo: document.getElementById('event-title').value,
+            };
+            
+            // SUBSTITUA PELA URL DO SEU WEBHOOK DO N8N
+            const n8nWebhookUrl = 'https://SEU_DOMINIO_N8N/webhook/SEU_ID_WEBHOOK';
+
+            // Envia os dados para o N8N
+            fetch(n8nWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    statusEl.innerText = 'Agendamento realizado com sucesso!';
+                    statusEl.style.color = 'green';
+                } else {
+                    statusEl.innerText = 'Ocorreu um erro ao agendar.';
+                    statusEl.style.color = 'red';
+                }
+            })
+            .catch(error => {
+                statusEl.innerText = 'Erro de comunicação com o servidor.';
+                statusEl.style.color = 'red';
+                console.error('Erro no fetch:', error);
+            });
+        });
+    </script>
+</body>
+</html>
