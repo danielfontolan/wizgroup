@@ -52,57 +52,44 @@
     </div>
     
 <script>
-    // Objeto para armazenar os dados contextuais
+    // Objeto para armazenar os dados contextuais que receberemos do Chatwoot
     let context = {};
 
-    console.log('Página agendador.html carregada. Verificando o estado do SDK.');
+    console.log('Página agendador.html carregada. Ouvindo por mensagens do Chatwoot...');
 
-    // --- NOVA LÓGICA DE INICIALIZAÇÃO ROBUSTA ---
-
-    // Esta é a função principal que executa a lógica do nosso app
-    function initializeApp(sdk) {
-        console.log('SDK detectado. Inicializando a aplicação...');
+    // Adiciona um "ouvinte" para o evento 'message'
+    window.addEventListener('message', function (event) {
         
-        // Pega os dados do contato
-        sdk.getContact().then(contactData => {
-            console.log('Dados do Contato recebidos:', contactData);
-            context.contact = contactData;
-            document.getElementById('lead-info').innerText = `Agendando para: ${contactData.name || 'Contato sem nome'}`;
-            document.getElementById('event-title').value = `Conversar com ${contactData.name}`;
-        }).catch(error => {
-            console.error('ERRO AO OBTER DADOS DO CONTATO:', error);
-            document.getElementById('status').innerText = 'Falha ao obter dados do Contato.';
-        });
+        // Medida de segurança: só aceita mensagens vindas da sua instância do Chatwoot
+        if (event.origin !== "https://chat.wizgroup.com.br") {
+            return;
+        }
 
-        // Pega os dados do usuário (vendedor)
-        sdk.getUser().then(userData => {
-            console.log('Dados do Usuário (vendedor) recebidos:', userData);
-            context.user = userData;
-        }).catch(error => {
-            console.error('ERRO AO OBTER DADOS DO USUÁRIO:', error);
-            document.getElementById('status').innerText = 'Falha ao obter dados do Vendedor.';
-        });
-    }
+        try {
+            const eventData = JSON.parse(event.data);
+            
+            // Log para descobrirmos a estrutura exata dos dados
+            console.log('MENSAGEM RECEBIDA DO CHATWOOT:', eventData);
 
-    // Função que será chamada quando o evento 'ready' for disparado
-    function onChatwootReady(event) {
-        console.log('Evento "chatwoot:ready" RECEBIDO!');
-        // O SDK passa a si mesmo como um detalhe do evento
-        initializeApp(event.detail);
-    }
+            // Verifica se a mensagem contém os dados do contato que precisamos
+            if (eventData.event === 'set:contact' || (eventData.contact && eventData.user)) {
+                console.log('Dados de contato e usuário identificados.');
+                
+                // Armazena os dados no nosso objeto de contexto
+                context.contact = eventData.contact;
+                context.user = eventData.user;
 
-    // Verifica se o SDK já está pronto quando nosso script roda
-    if (window.chatwootSDK) {
-        initializeApp(window.chatwootSDK);
-    } else {
-        // Se não, espera pelo evento 'ready' para inicializar
-        window.addEventListener('chatwoot:ready', onChatwootReady, false);
-    }
-
-    // --- FIM DA LÓGICA DE INICIALIZAÇÃO ---
-
+                // Atualiza a interface com os dados recebidos
+                document.getElementById('lead-info').innerText = `Agendando para: ${context.contact.name || 'Contato sem nome'}`;
+                document.getElementById('event-title').value = `Conversar com ${context.contact.name}`;
+            }
+        } catch (error) {
+            // Ignora mensagens que não são JSON, que podem ser enviadas por extensões do navegador
+        }
+    });
 
     // A lógica do formulário abaixo permanece a mesma
+    // ---------------------------------------------------
 
     // Lógica para mostrar/ocultar o subtipo de entrevista
     const tipoEventoSelect = document.getElementById('tipo-evento');
