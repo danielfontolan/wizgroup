@@ -55,47 +55,54 @@
     // Objeto para armazenar os dados contextuais
     let context = {};
 
-    console.log('Página agendador.html carregada. Preparando para ouvir o SDK.');
+    console.log('Página agendador.html carregada. Verificando o estado do SDK.');
 
-    try {
-        // Adiciona um "ouvinte" para o evento 'ready' do SDK assim que o script é lido
-        window.addEventListener('chatwoot:ready', function () {
-            console.log('Evento "chatwoot:ready" RECEBIDO! O SDK está pronto.');
+    // --- NOVA LÓGICA DE INICIALIZAÇÃO ROBUSTA ---
 
-            try {
-                console.log('Tentando obter o contato...');
-                const contactPromise = window.chatwootSDK.getContact();
-                
-                contactPromise.then(contactData => {
-                    console.log('Dados do Contato recebidos:', contactData);
-                    context.contact = contactData;
-                    document.getElementById('lead-info').innerText = `Agendando para: ${contactData.name || 'Contato sem nome'}`;
-                    document.getElementById('event-title').value = `Conversar com ${contactData.name}`;
-                }).catch(error => {
-                    console.error('ERRO AO OBTER DADOS DO CONTATO:', error);
-                    document.getElementById('status').innerText = 'Falha ao obter dados do Contato.';
-                });
-
-                console.log('Tentando obter o usuário...');
-                const userPromise = window.chatwootSDK.getUser();
-
-                userPromise.then(userData => {
-                    console.log('Dados do Usuário (vendedor) recebidos:', userData);
-                    context.user = userData;
-                }).catch(error => {
-                    console.error('ERRO AO OBTER DADOS DO USUÁRIO:', error);
-                    document.getElementById('status').innerText = 'Falha ao obter dados do Vendedor.';
-                });
-
-            } catch (sdkError) {
-                console.error('ERRO AO CHAMAR AS FUNÇÕES DO SDK:', sdkError);
-            }
+    // Esta é a função principal que executa a lógica do nosso app
+    function initializeApp(sdk) {
+        console.log('SDK detectado. Inicializando a aplicação...');
+        
+        // Pega os dados do contato
+        sdk.getContact().then(contactData => {
+            console.log('Dados do Contato recebidos:', contactData);
+            context.contact = contactData;
+            document.getElementById('lead-info').innerText = `Agendando para: ${contactData.name || 'Contato sem nome'}`;
+            document.getElementById('event-title').value = `Conversar com ${contactData.name}`;
+        }).catch(error => {
+            console.error('ERRO AO OBTER DADOS DO CONTATO:', error);
+            document.getElementById('status').innerText = 'Falha ao obter dados do Contato.';
         });
-    } catch (e) {
-        console.error('ERRO CRÍTICO AO ADICIONAR O EVENT LISTENER:', e);
+
+        // Pega os dados do usuário (vendedor)
+        sdk.getUser().then(userData => {
+            console.log('Dados do Usuário (vendedor) recebidos:', userData);
+            context.user = userData;
+        }).catch(error => {
+            console.error('ERRO AO OBTER DADOS DO USUÁRIO:', error);
+            document.getElementById('status').innerText = 'Falha ao obter dados do Vendedor.';
+        });
     }
-    
-    // A lógica abaixo permanece a mesma
+
+    // Função que será chamada quando o evento 'ready' for disparado
+    function onChatwootReady(event) {
+        console.log('Evento "chatwoot:ready" RECEBIDO!');
+        // O SDK passa a si mesmo como um detalhe do evento
+        initializeApp(event.detail);
+    }
+
+    // Verifica se o SDK já está pronto quando nosso script roda
+    if (window.chatwootSDK) {
+        initializeApp(window.chatwootSDK);
+    } else {
+        // Se não, espera pelo evento 'ready' para inicializar
+        window.addEventListener('chatwoot:ready', onChatwootReady, false);
+    }
+
+    // --- FIM DA LÓGICA DE INICIALIZAÇÃO ---
+
+
+    // A lógica do formulário abaixo permanece a mesma
 
     // Lógica para mostrar/ocultar o subtipo de entrevista
     const tipoEventoSelect = document.getElementById('tipo-evento');
@@ -106,7 +113,7 @@
 
     // Executa quando o formulário é enviado
     document.getElementById('schedule-form').addEventListener('submit', function(event) {
-        event.preventDefault(); // Impede o envio padrão do formulário
+        event.preventDefault(); 
 
         const statusEl = document.getElementById('status');
         statusEl.innerText = 'Enviando agendamento...';
@@ -124,7 +131,6 @@
         // SUBSTITUA PELA URL DO SEU WEBHOOK DO N8N
         const n8nWebhookUrl = 'https://SEU_DOMINIO_N8N/webhook/SEU_ID_WEBHOOK';
 
-        // Envia os dados para o N8N
         fetch(n8nWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
