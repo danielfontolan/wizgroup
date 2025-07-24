@@ -62,67 +62,76 @@
         
         // Medida de segurança: só aceita mensagens vindas da sua instância do Chatwoot
         if (event.origin !== "https://chat.wizgroup.com.br") {
+            console.log('Mensagem ignorada de origem não autorizada:', event.origin);
+            return;
+        }
+
+        console.log('--- NOVA MENSAGEM RECEBIDA ---');
+
+        // Passo 1: Verifica se o dado é uma string (necessário para o JSON.parse)
+        if (typeof event.data !== 'string') {
+            console.log('Mensagem ignorada: o dado não é uma string.', event.data);
             return;
         }
 
         try {
             const eventData = JSON.parse(event.data);
-            
-            // Verifica se a mensagem é a que contém os dados do contato
-            if (eventData.event === 'set:contact' && eventData.data.contact) {
-                console.log('Dados de contexto recebidos com sucesso!', eventData.data);
-                
-                // Armazena os dados no nosso objeto de contexto usando os caminhos corretos
-                context.contact = eventData.data.contact;
-                context.user = eventData.data.currentAgent;
+            console.log('Passo 2: Mensagem convertida para JSON com sucesso:', eventData);
 
-                // Atualiza a interface com os dados recebidos
-                const leadName = context.contact.name || 'Contato sem nome';
-                document.getElementById('lead-info').innerText = `Agendando para: ${leadName}`;
-                document.getElementById('event-title').value = `Conversar com ${leadName}`;
+            // Passo 3: Verifica se o evento é o que estamos procurando
+            if (eventData.event === 'set:contact') {
+                console.log('Passo 3: SUCESSO! Evento "set:contact" encontrado.');
+
+                // Passo 4: Verifica se os dados do contato existem dentro do evento
+                if (eventData.data && eventData.data.contact) {
+                    console.log('Passo 4: SUCESSO! Objeto "contact" encontrado dentro dos dados.');
+                    
+                    // Armazena os dados no nosso objeto de contexto
+                    context.contact = eventData.data.contact;
+                    context.user = eventData.data.currentAgent;
+
+                    // Atualiza a interface com os dados recebidos
+                    const leadName = context.contact.name || 'Contato sem nome';
+                    document.getElementById('lead-info').innerText = `Agendando para: ${leadName}`;
+                    document.getElementById('event-title').value = `Conversar com ${leadName}`;
+                    console.log('Passo 5: SUCESSO! Interface atualizada com o nome do lead.');
+
+                } else {
+                    console.error('ERRO no Passo 4: O evento é "set:contact", mas a estrutura eventData.data.contact não foi encontrada.');
+                }
+            } else {
+                console.log('Passo 3: Mensagem ignorada, não é o evento "set:contact". Evento recebido:', eventData.event);
             }
+
         } catch (error) {
-            // Ignora mensagens que não são JSON
+            console.error('ERRO no Passo 2: Falha ao tentar converter a mensagem para JSON. Mensagem original:', event.data, 'Erro:', error);
         }
     });
 
-    // A lógica do formulário abaixo permanece a mesma
+    // A lógica do formulário abaixo não precisa de alterações
     // ---------------------------------------------------
-
-    // Lógica para mostrar/ocultar o subtipo de entrevista
     const tipoEventoSelect = document.getElementById('tipo-evento');
     const subtipoGroup = document.getElementById('subtipo-group');
     tipoEventoSelect.addEventListener('change', function() {
         subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
     });
-
-    // Executa quando o formulário é enviado
     document.getElementById('schedule-form').addEventListener('submit', function(event) {
         event.preventDefault(); 
-
         const statusEl = document.getElementById('status');
         statusEl.innerText = 'Enviando agendamento...';
-
         const formData = {
-            contact: context.contact,
-            user: context.user,
+            contact: context.contact, user: context.user,
             tipoEvento: document.getElementById('tipo-evento').value,
             subtipoEntrevista: document.getElementById('subtipo-entrevista').value,
             data: document.getElementById('event-date').value,
             hora: document.getElementById('event-time').value,
             titulo: document.getElementById('event-title').value,
         };
-        
-        // SUBSTITUA PELA URL DO SEU WEBHOOK DO N8N
         const n8nWebhookUrl = 'https://SEU_DOMINIO_N8N/webhook/SEU_ID_WEBHOOK';
-
         fetch(n8nWebhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
+        }).then(response => response.json()).then(data => {
             if (data.status === 'success') {
                 statusEl.innerText = 'Agendamento realizado com sucesso!';
                 statusEl.style.color = 'green';
@@ -130,8 +139,7 @@
                 statusEl.innerText = 'Ocorreu um erro ao agendar.';
                 statusEl.style.color = 'red';
             }
-        })
-        .catch(error => {
+        }).catch(error => {
             statusEl.innerText = 'Erro de comunicação com o servidor.';
             statusEl.style.color = 'red';
             console.error('Erro no fetch:', error);
