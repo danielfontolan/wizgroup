@@ -68,23 +68,21 @@
         try {
             const eventData = JSON.parse(event.data);
             
-            // Log para descobrirmos a estrutura exata dos dados
-            console.log('MENSAGEM RECEBIDA DO CHATWOOT:', eventData);
-
-            // Verifica se a mensagem contém os dados do contato que precisamos
-            if (eventData.event === 'set:contact' || (eventData.contact && eventData.user)) {
-                console.log('Dados de contato e usuário identificados.');
+            // Verifica se a mensagem é a que contém os dados do contato
+            if (eventData.event === 'set:contact' && eventData.data.contact) {
+                console.log('Dados de contexto recebidos com sucesso!', eventData.data);
                 
-                // Armazena os dados no nosso objeto de contexto
-                context.contact = eventData.contact;
-                context.user = eventData.user;
+                // Armazena os dados no nosso objeto de contexto usando os caminhos corretos
+                context.contact = eventData.data.contact;
+                context.user = eventData.data.currentAgent;
 
                 // Atualiza a interface com os dados recebidos
-                document.getElementById('lead-info').innerText = `Agendando para: ${context.contact.name || 'Contato sem nome'}`;
-                document.getElementById('event-title').value = `Conversar com ${context.contact.name}`;
+                const leadName = context.contact.name || 'Contato sem nome';
+                document.getElementById('lead-info').innerText = `Agendando para: ${leadName}`;
+                document.getElementById('event-title').value = `Conversar com ${leadName}`;
             }
         } catch (error) {
-            // Ignora mensagens que não são JSON, que podem ser enviadas por extensões do navegador
+            // Ignora mensagens que não são JSON
         }
     });
 
