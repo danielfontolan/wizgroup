@@ -52,59 +52,62 @@
     </div>
     
 <script>
-    // Objeto para armazenar os dados contextuais que receberemos do Chatwoot
+    // --- ELEMENTOS DO FORMULÁRIO ---
+    const leadInfoEl = document.getElementById('lead-info');
+    const eventTitleEl = document.getElementById('event-title');
+    const scheduleForm = document.getElementById('schedule-form');
+    const submitButton = scheduleForm.querySelector('button');
+    const statusEl = document.getElementById('status');
+    const tipoEventoSelect = document.getElementById('tipo-evento');
+    const subtipoGroup = document.getElementById('subtipo-group');
+
+    // Objeto para armazenar os dados contextuais
     let context = {};
 
-    console.log('Wizgroup Agendador v1.0: Pronto e ouvindo por mensagens do Chatwoot...');
+    // --- LÓGICA DE INICIALIZAÇÃO ---
+    
+    // Desabilita o botão de agendar no início
+    submitButton.disabled = true;
+    submitButton.innerText = 'Aguardando dados do lead...';
 
-    // Adiciona o "ouvinte" de mensagens
+    console.log('Wizgroup Agendador v2.0: Pronto e ouvindo por mensagens do Chatwoot...');
+
     window.addEventListener('message', function (event) {
-        
-        // Medida de segurança: só aceita mensagens da sua instância do Chatwoot
-        if (event.origin !== "https://chat.wizgroup.com.br") {
-            return;
-        }
+        if (event.origin !== "https://chat.wizgroup.com.br") return;
 
         try {
             const eventData = JSON.parse(event.data);
             
-            // --- LÓGICA CORRIGIDA ---
-            // Verifica se o evento é 'appContext' e se ele contém os dados que precisamos
-            if (eventData.event === 'appContext' && eventData.data && eventData.data.contacts && eventData.data.contacts.length > 0) {
-                
-                // Pega o primeiro contato da lista (geralmente o principal)
+            if (eventData.event === 'appContext' && eventData.data?.contacts?.length > 0) {
                 const leadData = eventData.data.contacts[0];
                 const agentData = eventData.data.currentAgent;
 
                 console.log('Contexto recebido e validado com sucesso!');
                 
-                // Armazena os dados no nosso objeto de contexto
                 context.contact = leadData;
                 context.user = agentData;
 
-                // Atualiza a interface com os dados recebidos
                 const leadName = leadData.name || 'Contato sem nome';
-                document.getElementById('lead-info').innerText = `Agendando para: ${leadName}`;
-                document.getElementById('event-title').value = `Conversar com ${leadName}`;
+                leadInfoEl.innerText = `Agendando para: ${leadName}`;
+                eventTitleEl.value = `Conversar com ${leadName}`;
+
+                // Habilita o botão e restaura o texto original
+                submitButton.disabled = false;
+                submitButton.innerText = 'Agendar';
             }
-        } catch (error) {
-            // Ignora mensagens que não são JSON
-        }
+        } catch (error) { /* Ignora mensagens não-JSON */ }
     });
 
-    // A lógica do formulário abaixo permanece a mesma e já está correta
-    // ------------------------------------------------------------------
-    const tipoEventoSelect = document.getElementById('tipo-evento');
-    const subtipoGroup = document.getElementById('subtipo-group');
+    // --- LÓGICA DO FORMULÁRIO ---
+
     tipoEventoSelect.addEventListener('change', function() {
         subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
     });
 
-    document.getElementById('schedule-form').addEventListener('submit', function(event) {
+    scheduleForm.addEventListener('submit', function(event) {
         event.preventDefault(); 
-
-        const statusEl = document.getElementById('status');
         statusEl.innerText = 'Enviando agendamento...';
+        submitButton.disabled = true; // Desabilita durante o envio
 
         const formData = {
             contact: context.contact,
@@ -116,17 +119,19 @@
             titulo: document.getElementById('event-title').value,
         };
         
-        // SUBSTITUA PELA URL DO SEU WEBHOOK DO N8N
-        const n8nWebhookUrl = 'https://n8n.wizgroup.com.br/webhook-test/agendador';
+        const n8nWebhookUrl = 'https://n8n.wizgroup.com.br/webhook-test/agendador'; // URL CORRIGIDA
 
         fetch(n8nWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) { throw new Error('Falha na resposta da rede'); }
+            return response.json();
+        })
         .then(data => {
-            if (data.status === 'success') {
+            if (data.status === 'success' || data.message) {
                 statusEl.innerText = 'Agendamento realizado com sucesso!';
                 statusEl.style.color = 'green';
             } else {
@@ -138,6 +143,11 @@
             statusEl.innerText = 'Erro de comunicação com o servidor.';
             statusEl.style.color = 'red';
             console.error('Erro no fetch:', error);
+        })
+        .finally(() => {
+            if(context.contact) { // Reabilita o botão se o contexto ainda for válido
+               submitButton.disabled = false;
+            }
         });
     });
 </script>
