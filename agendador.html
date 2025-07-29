@@ -2,58 +2,171 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Wizgroup - Inspetor de Mensagens do Chatwoot</title>
+    <title>Wizgroup - Agendador de Atividade</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 15px; }
-        h3 { border-bottom: 1px solid #ccc; padding-bottom: 10px; }
-        pre { 
-            background-color: #f0f0f0; 
-            border: 1px solid #ccc; 
-            padding: 10px; 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; margin: 15px; font-size: 14px; background-color: #f8f9fa; color: #343a40; }
+        .container { max-width: 400px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select, button { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        button { padding: 10px; border: none; background-color: #007bff; color: white; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover:not(:disabled) { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #status { margin-top: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
-
-    <h3>Inspetor de Mensagens do Chatwoot</h3>
-    <p>Esta página irá registrar todas as mensagens recebidas do Chatwoot abaixo.</p>
-    <pre id="log-output">Aguardando mensagens...</pre>
+    <div class="container">
+        <h3>Agendar Atividade</h3>
+        <p id="lead-info">Carregando dados do lead...</p>
+        <form id="schedule-form">
+            <div class="form-group">
+                <label for="tipo-evento">Tipo de Evento</label>
+                <select id="tipo-evento" name="tipo-evento" required>
+                    <option value="Entrevista">Entrevista</option>
+                    <option value="Follow-up">Follow-up (Tarefa)</option>
+                </select>
+            </div>
+            <div class="form-group" id="subtipo-group">
+                <label for="subtipo-entrevista">Tipo de Entrevista</label>
+                <select id="subtipo-entrevista" name="subtipo-entrevista">
+                    <option value="Online">Online</option>
+                    <option value="Presencial">Presencial</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="event-date">Data</label>
+                <input type="date" id="event-date" name="event-date" required>
+            </div>
+            <div class="form-group">
+                <label for="event-time">Hora</label>
+                <input type="time" id="event-time" name="event-time" required>
+            </div>
+            <div class="form-group">
+                <label for="event-title">Título / Objetivo</label>
+                <input type="text" id="event-title" name="event-title" required>
+            </div>
+            <button type="submit">Agendar</button>
+        </form>
+        <p id="status"></p>
+    </div>
 
     <script>
-        const logOutput = document.getElementById('log-output');
-        let messageCount = 0;
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- ELEMENTOS DO FORMULÁRIO ---
+            const leadInfoEl = document.getElementById('lead-info');
+            const eventTitleEl = document.getElementById('event-title');
+            const scheduleForm = document.getElementById('schedule-form');
+            const submitButton = scheduleForm.querySelector('button');
+            const statusEl = document.getElementById('status');
+            const tipoEventoSelect = document.getElementById('tipo-evento');
+            const subtipoGroup = document.getElementById('subtipo-group');
 
-        // Limpa a mensagem inicial
-        logOutput.textContent = 'Ouvindo...\n\n';
+            // Objeto para armazenar os dados contextuais
+            let context = {};
 
-        window.addEventListener('message', function(event) {
-            // Filtro de segurança essencial
-            if (event.origin !== "https://chat.wizgroup.com.br") {
-                return;
-            }
-
-            messageCount++;
+            // --- LÓGICA DE INICIALIZAÇÃO ---
             
-            let logText = `--- MENSAGEM RECEBIDA #${messageCount} ---\n`;
-            logText += `Origem: ${event.origin}\n`;
-            logText += `Dado Bruto (Tipo: ${typeof event.data}):\n${event.data}\n\n`;
-            
-            // Tenta formatar como JSON para melhor visualização, se possível
-            try {
-                const parsedData = JSON.parse(event.data);
-                logText += `Dado Formatado como Objeto JSON:\n${JSON.stringify(parsedData, null, 2)}\n`;
-            } catch (e) {
-                logText += `(O dado recebido não é um JSON válido.)\n`;
-            }
+            // Desabilita o botão de agendar no início
+            submitButton.disabled = true;
+            submitButton.innerText = 'Aguardando dados do lead...';
 
-            logText += '-----------------------------------\n\n';
-            
-            // Adiciona o log na tela, em vez do console
-            logOutput.textContent += logText;
+            console.log('Wizgroup Agendador v4.0 (Produção): Pronto e ouvindo...');
+
+            // --- LÓGICA DE COMUNICAÇÃO COM CHATWOOT ---
+
+            window.addEventListener('message', function (event) {
+                // Medida de segurança: só aceita mensagens da sua instância do Chatwoot
+                if (event.origin !== "https://chat.wizgroup.com.br") {
+                    return;
+                }
+
+                try {
+                    const eventData = JSON.parse(event.data);
+                    
+                    // Lógica corrigida para o evento 'appContext'
+                    if (eventData.event === 'appContext' && eventData.data && eventData.data.contact) {
+                        
+                        const leadData = eventData.data.contact;
+                        const agentData = eventData.data.currentAgent;
+
+                        console.log('Contexto do Chatwoot recebido e validado com sucesso!');
+                        
+                        context.contact = leadData;
+                        context.user = agentData;
+
+                        const leadName = leadData.name || 'Contato sem nome';
+                        leadInfoEl.innerText = `Agendando para: ${leadName}`;
+                        eventTitleEl.value = `Conversar com ${leadName}`;
+
+                        // Habilita o botão e restaura o texto original
+                        submitButton.disabled = false;
+                        submitButton.innerText = 'Agendar';
+                    }
+                } catch (error) { /* Ignora mensagens que não são JSON */ }
+            });
+
+            // Ação proativa para solicitar os dados ao Chatwoot, caso ele não envie automaticamente
+            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizgroup.com.br');
+
+
+            // --- LÓGICA DO FORMULÁRIO ---
+
+            tipoEventoSelect.addEventListener('change', function() {
+                subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
+            });
+
+            scheduleForm.addEventListener('submit', function(event) {
+                event.preventDefault(); 
+                statusEl.innerText = 'Enviando agendamento...';
+                submitButton.disabled = true;
+
+                const formData = {
+                    contact: context.contact,
+                    user: context.user,
+                    tipoEvento: document.getElementById('tipo-evento').value,
+                    subtipoEntrevista: document.getElementById('subtipo-entrevista').value,
+                    data: document.getElementById('event-date').value,
+                    hora: document.getElementById('event-time').value,
+                    titulo: document.getElementById('event-title').value,
+                };
+                
+                // Verificação final antes de enviar
+                if (!formData.contact || !formData.user) {
+                    statusEl.innerText = 'Erro: Dados do lead não carregados. Tente recarregar.';
+                    statusEl.style.color = 'red';
+                    submitButton.disabled = false;
+                    return;
+                }
+                
+                // !! IMPORTANTE: SUBSTITUA PELA URL CORRETA DO SEU WEBHOOK DO N8N !!
+                const n8nWebhookUrl = 'https://n8n.wizgroup.com.br/webhook-test/agendador';
+
+                fetch(n8nWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => {
+                    if (!response.ok) { throw new Error('Falha na resposta da rede'); }
+                    return response.json();
+                })
+                .then(data => {
+                    statusEl.innerText = 'Agendamento realizado com sucesso!';
+                    statusEl.style.color = 'green';
+                })
+                .catch(error => {
+                    statusEl.innerText = 'Erro de comunicação com o servidor.';
+                    statusEl.style.color = 'red';
+                    console.error('Erro no fetch:', error);
+                })
+                .finally(() => {
+                    // Mantém o botão desabilitado após o sucesso para evitar duplo envio
+                    if(statusEl.style.color !== 'green'){
+                        submitButton.disabled = false;
+                    }
+                });
+            });
         });
     </script>
 </body>
