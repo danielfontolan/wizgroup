@@ -52,123 +52,116 @@
         <p id="status"></p>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // --- ELEMENTOS DO FORMULÁRIO ---
-            const leadInfoEl = document.getElementById('lead-info');
-            const eventTitleEl = document.getElementById('event-title');
-            const scheduleForm = document.getElementById('schedule-form');
-            const submitButton = scheduleForm.querySelector('button');
-            const statusEl = document.getElementById('status');
-            const tipoEventoSelect = document.getElementById('tipo-evento');
-            const subtipoGroup = document.getElementById('subtipo-group');
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- ELEMENTOS DO FORMULÁRIO ---
+        const leadInfoEl = document.getElementById('lead-info');
+        const eventTitleEl = document.getElementById('event-title');
+        const scheduleForm = document.getElementById('schedule-form');
+        const submitButton = scheduleForm.querySelector('button');
+        const statusEl = document.getElementById('status');
+        const tipoEventoSelect = document.getElementById('tipo-evento');
+        const subtipoGroup = document.getElementById('subtipo-group');
 
-            // Objeto para armazenar os dados contextuais
-            let context = {};
+        // Objeto para armazenar os dados contextuais
+        let context = {};
 
-            // --- LÓGICA DE INICIALIZAÇÃO ---
-            
-            // Desabilita o botão de agendar no início
-            submitButton.disabled = true;
-            submitButton.innerText = 'Aguardando dados do lead...';
+        // --- LÓGICA DE INICIALIZAÇÃO ---
+        
+        submitButton.disabled = true;
+        submitButton.innerText = 'Aguardando dados do lead...';
 
-            console.log('Wizgroup Agendador v4.0 (Produção): Pronto e ouvindo...');
+        console.log('Wizgroup Agendador v4.1 (Produção): Pronto e ouvindo...');
 
-            // --- LÓGICA DE COMUNICAÇÃO COM CHATWOOT ---
+        // --- LÓGICA DE COMUNICAÇÃO COM CHATWOOT ---
 
-            window.addEventListener('message', function (event) {
-                // Medida de segurança: só aceita mensagens da sua instância do Chatwoot
-                if (event.origin !== "https://chat.wizgroup.com.br") {
-                    return;
-                }
+        window.addEventListener('message', function (event) {
+            if (event.origin !== "https://chat.wizgroup.com.br") return;
 
-                try {
-                    const eventData = JSON.parse(event.data);
+            try {
+                const eventData = JSON.parse(event.data);
+                
+                if (eventData.event === 'appContext' && eventData.data && eventData.data.contact) {
                     
-                    // Lógica corrigida para o evento 'appContext'
-                    if (eventData.event === 'appContext' && eventData.data && eventData.data.contact) {
-                        
-                        const leadData = eventData.data.contact;
-                        const agentData = eventData.data.currentAgent;
+                    const leadData = eventData.data.contact;
+                    const agentData = eventData.data.currentAgent;
+                    const conversationData = eventData.data.conversation; // NOVO: Captura os dados da conversa
 
-                        console.log('Contexto do Chatwoot recebido e validado com sucesso!');
-                        
-                        context.contact = leadData;
-                        context.user = agentData;
+                    console.log('Contexto do Chatwoot recebido e validado com sucesso!');
+                    
+                    context.contact = leadData;
+                    context.user = agentData;
+                    context.conversation = conversationData; // NOVO: Armazena os dados da conversa
 
-                        const leadName = leadData.name || 'Contato sem nome';
-                        leadInfoEl.innerText = `Agendando para: ${leadName}`;
-                        eventTitleEl.value = `Conversar com ${leadName}`;
+                    const leadName = leadData.name || 'Contato sem nome';
+                    leadInfoEl.innerText = `Agendando para: ${leadName}`;
+                    eventTitleEl.value = `Conversar com ${leadName}`;
 
-                        // Habilita o botão e restaura o texto original
-                        submitButton.disabled = false;
-                        submitButton.innerText = 'Agendar';
-                    }
-                } catch (error) { /* Ignora mensagens que não são JSON */ }
-            });
-
-            // Ação proativa para solicitar os dados ao Chatwoot, caso ele não envie automaticamente
-            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizgroup.com.br');
-
-
-            // --- LÓGICA DO FORMULÁRIO ---
-
-            tipoEventoSelect.addEventListener('change', function() {
-                subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
-            });
-
-            scheduleForm.addEventListener('submit', function(event) {
-                event.preventDefault(); 
-                statusEl.innerText = 'Enviando agendamento...';
-                submitButton.disabled = true;
-
-                const formData = {
-                    contact: context.contact,
-                    user: context.user,
-                    tipoEvento: document.getElementById('tipo-evento').value,
-                    subtipoEntrevista: document.getElementById('subtipo-entrevista').value,
-                    data: document.getElementById('event-date').value,
-                    hora: document.getElementById('event-time').value,
-                    titulo: document.getElementById('event-title').value,
-                };
-                
-                // Verificação final antes de enviar
-                if (!formData.contact || !formData.user) {
-                    statusEl.innerText = 'Erro: Dados do lead não carregados. Tente recarregar.';
-                    statusEl.style.color = 'red';
                     submitButton.disabled = false;
-                    return;
+                    submitButton.innerText = 'Agendar';
                 }
-                
-                // !! IMPORTANTE: SUBSTITUA PELA URL CORRETA DO SEU WEBHOOK DO N8N !!
-                const n8nWebhookUrl = 'https://n8n.wizgroup.com.br/webhook-test/agendador';
+            } catch (error) { /* Ignora mensagens não-JSON */ }
+        });
+        
+        window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizgroup.com.br');
 
-                fetch(n8nWebhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => {
-                    if (!response.ok) { throw new Error('Falha na resposta da rede'); }
-                    return response.json();
-                })
-                .then(data => {
-                    statusEl.innerText = 'Agendamento realizado com sucesso!';
-                    statusEl.style.color = 'green';
-                })
-                .catch(error => {
-                    statusEl.innerText = 'Erro de comunicação com o servidor.';
-                    statusEl.style.color = 'red';
-                    console.error('Erro no fetch:', error);
-                })
-                .finally(() => {
-                    // Mantém o botão desabilitado após o sucesso para evitar duplo envio
-                    if(statusEl.style.color !== 'green'){
-                        submitButton.disabled = false;
-                    }
-                });
+        // --- LÓGICA DO FORMULÁRIO ---
+
+        tipoEventoSelect.addEventListener('change', function() {
+            subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
+        });
+
+        scheduleForm.addEventListener('submit', function(event) {
+            event.preventDefault(); 
+            statusEl.innerText = 'Enviando agendamento...';
+            submitButton.disabled = true;
+
+            const formData = {
+                contact: context.contact,
+                user: context.user,
+                tipoEvento: document.getElementById('tipo-evento').value,
+                subtipoEntrevista: document.getElementById('subtipo-entrevista').value,
+                data: document.getElementById('event-date').value,
+                hora: document.getElementById('event-time').value,
+                titulo: document.getElementById('event-title').value,
+                accountId: context.conversation ? context.conversation.account_id : null, // NOVO
+                conversationId: context.conversation ? context.conversation.id : null,     // NOVO
+            };
+            
+            if (!formData.contact || !formData.user) {
+                statusEl.innerText = 'Erro: Dados do lead não carregados. Tente recarregar.';
+                statusEl.style.color = 'red';
+                submitButton.disabled = false;
+                return;
+            }
+            
+            const n8nWebhookUrl = 'https://n8n.wizgroup.com.br/webhook-test/agendador';
+
+            fetch(n8nWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                if (!response.ok) { throw new Error('Falha na resposta da rede'); }
+                return response.json();
+            })
+            .then(data => {
+                statusEl.innerText = 'Agendamento realizado com sucesso!';
+                statusEl.style.color = 'green';
+            })
+            .catch(error => {
+                statusEl.innerText = 'Erro de comunicação com o servidor.';
+                statusEl.style.color = 'red';
+                console.error('Erro no fetch:', error);
+            })
+            .finally(() => {
+                if(statusEl.style.color !== 'green'){
+                    submitButton.disabled = false;
+                }
             });
         });
-    </script>
+    });
+</script>
 </body>
 </html>
