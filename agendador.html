@@ -131,7 +131,8 @@
                         body: JSON.stringify({
                             action: 'cancel', // Ação para o N8N identificar
                             contact: context.contact,
-                            user: context.user
+                            user: context.user,
+                            accountId: context.conversation?.account_id
                         })
                     })
                     .then(response => response.json())
