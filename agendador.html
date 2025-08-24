@@ -26,8 +26,8 @@
                 <label for="tipo-evento">Tipo de Evento</label>
                 <select id="tipo-evento" name="tipo-evento" required>
                     <option value="Entrevista">Entrevista</option>
-                    <option value="Follow-up">Follow-up</option>
-                    <option value="Aula-exp">Aula Experimental</option>
+                    <option value="Aula Experimental">Aula Experimental</option>
+                    <option value="Follow-up">Follow-up (Tarefa)</option>
                 </select>
             </div>
             <div class="form-group" id="subtipo-group">
@@ -64,12 +64,12 @@
             const statusEl = document.getElementById('status');
             const tipoEventoSelect = document.getElementById('tipo-evento');
             const subtipoGroup = document.getElementById('subtipo-group');
-            const cancelButton = document.getElementById('cancel-button'); // MELHORIA 3
+            const cancelButton = document.getElementById('cancel-button');
 
             let context = {};
             
             submitButton.disabled = true;
-            cancelButton.disabled = true; // MELHORIA 3
+            cancelButton.disabled = true;
             submitButton.innerText = 'Aguardando dados do lead...';
 
             window.addEventListener('message', function (event) {
@@ -85,11 +85,10 @@
                         const leadName = context.contact.name || 'Contato sem nome';
                         leadInfoEl.innerText = `Agendando para: ${leadName}`;
                         
-                        // MELHORIA 1: Título dinâmico inicial
                         updateEventTitle();
 
                         submitButton.disabled = false;
-                        cancelButton.disabled = false; // MELHORIA 3
+                        cancelButton.disabled = false;
                         submitButton.innerText = 'Agendar';
                     }
                 } catch (error) { /* Ignora */ }
@@ -97,9 +96,6 @@
             
             window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizgroup.com.br');
 
-            // --- LÓGICA DAS MELHORIAS ---
-
-            // MELHORIA 1: Função para atualizar o título dinamicamente
             function updateEventTitle() {
                 const leadName = context.contact?.name || 'Lead';
                 const eventType = tipoEventoSelect.value;
@@ -107,11 +103,16 @@
             }
 
             tipoEventoSelect.addEventListener('change', function() {
-                subtipoGroup.style.display = this.value === 'Entrevista' ? 'block' : 'none';
-                updateEventTitle(); // MELHORIA 1: Atualiza o título ao trocar o tipo
+                // ALTERAÇÃO 2: Lógica de visibilidade ajustada
+                // Agora, o campo só fica oculto se o valor for 'Follow-up'
+                subtipoGroup.style.display = this.value === 'Follow-up' ? 'none' : 'block';
+                updateEventTitle();
             });
+            
+            // Dispara o evento 'change' uma vez no carregamento para definir o estado inicial correto
+            tipoEventoSelect.dispatchEvent(new Event('change'));
 
-            // MELHORIA 3: Lógica do botão de cancelar
+
             cancelButton.addEventListener('click', function() {
                 if (!context.contact) {
                     alert('Aguarde os dados do lead serem carregados.');
@@ -122,17 +123,15 @@
                     submitButton.disabled = true;
                     cancelButton.disabled = true;
 
-                    // A URL do webhook pode ser a mesma, mas enviaremos uma 'action' diferente
                     const n8nWebhookUrl = 'https://webhook.wizgroup.com.br/webhook/agendador';
                     
                     fetch(n8nWebhookUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            action: 'cancel', // Ação para o N8N identificar
+                            action: 'cancel',
                             contact: context.contact,
-                            user: context.user,
-                            accountId: context.conversation?.account_id
+                            user: context.user
                         })
                     })
                     .then(response => response.json())
@@ -151,26 +150,24 @@
                 }
             });
 
-            // --- LÓGICA DE SUBMISSÃO DO FORMULÁRIO ---
             scheduleForm.addEventListener('submit', function(event) {
                 event.preventDefault();
                 statusEl.innerText = 'Enviando agendamento...';
                 submitButton.disabled = true;
                 cancelButton.disabled = true;
 
-                // MELHORIA 2: Validação de e-mail para entrevistas online
-                const isOnlineInterview = tipoEventoSelect.value === 'Entrevista' && document.getElementById('subtipo-entrevista').value === 'Online';
+                const isOnlineInterview = (tipoEventoSelect.value === 'Entrevista' || tipoEventoSelect.value === 'Aula Experimental') && document.getElementById('subtipo-entrevista').value === 'Online';
                 if (isOnlineInterview && !context.contact.email) {
-                    alert('Para agendar uma entrevista online, é obrigatório que o lead tenha um e-mail cadastrado no Chatwoot. Por favor, adicione o e-mail ao cadastro e tente novamente.');
+                    alert('Para agendar uma atividade online, é obrigatório que o lead tenha um e-mail cadastrado no Chatwoot. Por favor, adicione o e-mail ao cadastro e tente novamente.');
                     statusEl.innerText = 'Falha na validação: E-mail ausente.';
                     statusEl.style.color = 'red';
                     submitButton.disabled = false;
                     cancelButton.disabled = false;
-                    return; // Interrompe o processo
+                    return;
                 }
 
                 const formData = {
-                    action: 'create', // Ação para o N8N identificar
+                    action: 'create',
                     contact: context.contact,
                     user: context.user,
                     tipoEvento: tipoEventoSelect.value,
