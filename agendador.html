@@ -73,7 +73,7 @@
             submitButton.innerText = 'Aguardando dados do lead...';
 
             window.addEventListener('message', function (event) {
-                if (event.origin !== "https://chat.wizgroup.com.br") return;
+                if (event.origin !== "https://chat.wizardcapivari.com.br") return;
 
                 try {
                     const eventData = JSON.parse(event.data);
@@ -94,7 +94,7 @@
                 } catch (error) { /* Ignora */ }
             });
             
-            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizgroup.com.br');
+            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizardcapivari.com.br');
 
             function updateEventTitle() {
                 const leadName = context.contact?.name || 'Lead';
@@ -123,7 +123,7 @@
                     submitButton.disabled = true;
                     cancelButton.disabled = true;
 
-                    const n8nWebhookUrl = 'https://webhook.wizgroup.com.br/webhook/agendador';
+                    const n8nWebhookUrl = 'https://webhook.wizardcapivari.com.br/webhook/agendador';
                     
                     fetch(n8nWebhookUrl, {
                         method: 'POST',
@@ -179,7 +179,7 @@
                     conversationId: context.conversation?.id,
                 };
                 
-                const n8nWebhookUrl = 'https://webhook.wizgroup.com.br/webhook/agendador';
+                const n8nWebhookUrl = 'https://webhook.wizardcapivari.com.br/webhook/agendador';
                 fetch(n8nWebhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
