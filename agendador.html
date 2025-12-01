@@ -131,6 +131,7 @@
                         body: JSON.stringify({
                             action: 'cancel',
                             contact: context.contact,
+                            accountId: context.conversation?.account_id,    
                             user: context.user
                         })
                     })
