@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Tickets - Chatwoot</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 15px; background-color: #f8f9fa; color: #343a40; font-size: 14px; }
+        
+        /* Estilos das Abas */
+        .tabs { display: flex; border-bottom: 2px solid #dee2e6; margin-bottom: 15px; }
+        .tab { padding: 10px 15px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-weight: 500; color: #6c757d; }
+        .tab.active { border-bottom: 2px solid #007bff; color: #007bff; }
+        .tab:hover:not(.active) { color: #495057; }
+        
+        /* Conteúdo das Abas */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Formulários */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input, textarea, select { width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        /* Botões */
+        button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        
+        /* Utilitários */
+        .status-msg { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .hidden { display: none; }
+        
+        /* Loading */
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin: 20px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('abrir')">Abrir Novo</div>
+        <div class="tab" onclick="switchTab('consultar')">Consultar</div>
+        <div class="tab" onclick="switchTab('atualizar')">Atualizar</div>
+    </div>
+
+    <div id="tab-abrir" class="tab-content active">
+        <div id="loading-context" style="text-align: center; color: #666;">
+            <div class="loader" style="display: block;"></div>
+            <p>A carregar dados da conversa...</p>
+        </div>
+
+        <div id="form-container" class="hidden">
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                <strong>Cliente:</strong> <span id="contact-name">...</span><br>
+                <strong>Email:</strong> <span id="contact-email">...</span>
+            </p>
+            
+            <form id="form-abrir">
+                <div class="form-group">
+                    <label for="assunto">Assunto</label>
+                    <input type="text" id="assunto" required placeholder="Ex: Erro no pagamento">
+                </div>
+                
+                <div class="form-group">
+                    <label for="descricao">Descrição Detalhada</label>
+                    <textarea id="descricao" required placeholder="Descreva o problema..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="prioridade">Prioridade</label>
+                    <select id="prioridade">
+                        <option value="Baixa">Baixa</option>
+                        <option value="Média" selected>Média</option>
+                        <option value="Alta">Alta</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="btn-abrir">Abrir Chamado</button>
+            </form>
+        </div>
+        <div id="status-abrir" class="status-msg"></div>
+    </div>
+
+    <div id="tab-consultar" class="tab-content">
+        <div class="form-group">
+            <label for="consulta-id">ID do Protocolo</label>
+            <input type="text" id="consulta-id" placeholder="Ex: CHAMADO-2025...">
+        </div>
+        <button onclick="alert('Funcionalidade em desenvolvimento na Fase 2')">Pesquisar</button>
+    </div>
+
+    <div id="tab-atualizar" class="tab-content">
+        <p>Área para atribuir responsável ou fechar chamado.</p>
+        <button onclick="alert('Funcionalidade em desenvolvimento na Fase 2')">Carregar Dados</button>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        // COLOQUE AQUI A URL DO SEU WEBHOOK DE CRIAÇÃO (WORKFLOW 1)
+        const N8N_WEBHOOK_ABRIR = 'https://webhook.wizardcapivari.com.br/tickets/abrir';
+        
+        // Estado da aplicação
+        let context = {
+            contact: null,
+            conversation: null,
+            user: null
+        };
+
+        // --- SISTEMA DE ABAS ---
+        function switchTab(tabId) {
+            // Remove active de todos
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Ativa o selecionado
+            const tabIndex = ['abrir', 'consultar', 'atualizar'].indexOf(tabId);
+            document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        // --- INTEGRAÇÃO CHATWOOT ---
+        window.addEventListener('message', function (event) {
+            // Validação de origem (segurança)
+            if (!event.origin.includes('wizardcapivari.com.br') && !event.origin.includes('wizgroup.com.br')) {
+                // return; // Descomente em produção após validar a origem exata
+            }
+
+            try {
+                const eventData = JSON.parse(event.data);
+
+                // Escuta o evento appContext (igual ao projeto do agendador)
+                if (eventData.event === 'appContext' && eventData.data) {
+                    const data = eventData.data;
+                    
+                    // Guarda o contexto
+                    context.contact = data.contact;
+                    context.conversation = data.conversation;
+                    context.user = data.currentAgent;
+
+                    // Atualiza a UI
+                    document.getElementById('loading-context').style.display = 'none';
+                    document.getElementById('form-container').classList.remove('hidden');
+                    
+                    if (context.contact) {
+                        document.getElementById('contact-name').textContent = context.contact.name || 'Sem nome';
+                        document.getElementById('contact-email').textContent = context.contact.email || 'Sem email';
+                    }
+                }
+            } catch (e) { console.error('Erro ao processar mensagem', e); }
+        });
+
+        // Solicita os dados ao carregar (Proativo)
+        window.parent.postMessage('chatwoot-dashboard-app:fetch-info', '*');
+
+        // --- ENVIO DO FORMULÁRIO (ABRIR CHAMADO) ---
+        document.getElementById('form-abrir').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btn-abrir');
+            const statusDiv = document.getElementById('status-abrir');
+            
+            // UI Loading
+            btn.disabled = true;
+            btn.textContent = 'A criar chamado...';
+            statusDiv.style.display = 'none';
+
+            // Dados a enviar para o N8N
+            const payload = {
+                assunto: document.getElementById('assunto').value,
+                descricao: document.getElementById('descricao').value,
+                prioridade: document.getElementById('prioridade').value,
+                // Dados do Contexto Chatwoot
+                contact_name: context.contact?.name,
+                contact_email: context.contact?.email,
+                contact_phone: context.contact?.phone_number,
+                conversation_id: context.conversation?.id,
+                account_id: context.conversation?.account_id, // Importante para o link
+                agent_name: context.user?.name,
+                agent_email: context.user?.email
+            };
+
+            try {
+                const response = await fetch(N8N_WEBHOOK_ABRIR, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusDiv.className = 'status-msg success';
+                    // Se o N8N retornar o ID, mostramos aqui
+                    const protocolo = result.protocolo || result.ID_Protocolo || 'Gerado';
+                    statusDiv.innerHTML = `✅ Chamado criado com sucesso!<br><strong>Protocolo: ${protocolo}</strong>`;
+                    document.getElementById('form-abrir').reset();
+                } else {
+                    throw new Error('Erro na resposta do servidor');
+                }
+            } catch (error) {
+                console.error(error);
+                statusDiv.className = 'status-msg error';
+                statusDiv.textContent = '❌ Erro ao criar chamado. Verifique o console.';
+            } finally {
+                statusDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Abrir Chamado';
+            }
+        });
+    </script>
+</body>
+</html>
