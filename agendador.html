@@ -123,7 +123,7 @@
                     submitButton.disabled = true;
                     cancelButton.disabled = true;
 
-                    const n8nWebhookUrl = 'https://webhook.wizardcapivari.com.br/webhook/agendador';
+                    const n8nWebhookUrl = 'https://n8n.wizardcapivari.com.br/webhook/agendador';
                     
                     fetch(n8nWebhookUrl, {
                         method: 'POST',
@@ -180,7 +180,7 @@
                     conversationId: context.conversation?.id,
                 };
                 
-                const n8nWebhookUrl = 'https://webhook.wizardcapivari.com.br/webhook/agendador';
+                const n8nWebhookUrl = 'https://n8n.wizardcapivari.com.br/webhook/agendador';
                 fetch(n8nWebhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
