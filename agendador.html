@@ -73,7 +73,7 @@
             submitButton.innerText = 'Aguardando dados do lead...';
 
             window.addEventListener('message', function (event) {
-                if (event.origin !== "https://chat.wizardcapivari.com.br") return;
+                if (event.origin !== "https://crm.wizardcapivari.com.br") return;
 
                 try {
                     const eventData = JSON.parse(event.data);
@@ -94,7 +94,7 @@
                 } catch (error) { /* Ignora */ }
             });
             
-            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://chat.wizardcapivari.com.br');
+            window.parent.postMessage('chatwoot-dashboard-app:fetch-info', 'https://crm.wizardcapivari.com.br');
 
             function updateEventTitle() {
                 const leadName = context.contact?.name || 'Lead';
